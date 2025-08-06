@@ -64,6 +64,8 @@ def process_and_analyze_ocr_output(raw_text: str) -> list[dict]:
             continue
             
         description = extracted_data.get('description', '')
+        if not description:
+            description = ""
 
         # 4. Phân loại giao dịch
         category = "Khác"

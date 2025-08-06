@@ -1,0 +1,23 @@
+{
+  "suspicious_amount_threshold": 3000000,
+  "suspicious_keywords": [
+    "tiền mặt"
+  ],
+  "categorization_rules": {
+    "Đi lại": [
+      "máy bay",
+      "taxi",
+      "grab"
+    ],
+    "Tiếp khách & Ăn uống": [
+      "ăn trưa",
+      "cà phê",
+      "tiếp khách"
+    ],
+    "Marketing": [
+      "quảng cáo",
+      "ads",
+      "facebook"
+    ]
+  }
+}

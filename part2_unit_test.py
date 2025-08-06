@@ -1,5 +1,7 @@
 # test_solution.py
 
+import json
+import logging
 import unittest
 # Import hàm cần được kiểm thử từ file part2_solution.py
 from part2_solution import process_and_analyze_ocr_output
@@ -39,7 +41,7 @@ class TestProcessOCRSolution(unittest.TestCase):
             {'id': 'T005', 'date': '2025-07-31', 'amount': 250000, 'description': 'Tiền taxi ra sân bay', 'category': 'Đi lại', 'is_suspicious': False},
             {'id': 'T006', 'date': '2025-07-31', 'amount': 5000000, 'description': 'Rút tiền mặt khẩn cấp', 'category': 'Khác', 'is_suspicious': True}
         ]
-        result = process_and_analyze_ocr_output(raw_ocr_text)
+        result = process_and_analyze_ocr_output(raw_ocr_text, config_rules)
         self.assertEqual(result, expected_output)
 
     # ===== Test Case 2: Đầu vào rỗng =====
@@ -48,7 +50,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         Kiểm tra trường hợp ngoại lệ: đầu vào là một chuỗi rỗng.
         Hàm nên trả về một danh sách rỗng một cách an toàn.
         """
-        self.assertEqual(process_and_analyze_ocr_output(""), [])
+        self.assertEqual(process_and_analyze_ocr_output("", config_rules), [])
 
     # ===== Test Case 3: Không có giao dịch hợp lệ =====
     def test_no_valid_transactions(self):
@@ -57,7 +59,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         Ví dụ: tất cả các block đều thiếu trường 'amount'.
         """
         raw_text = "ID: T007, Date: 2025-07-28, Desc: Cà phê với team\n---\nID: T008, Desc: Test"
-        self.assertEqual(process_and_analyze_ocr_output(raw_text), [])
+        self.assertEqual(process_and_analyze_ocr_output(raw_text, config_rules), [])
 
     # ===== Test Case 4: Lọc Amount lỗi =====
     def test_filtering_of_malformed_amount(self):
@@ -66,7 +68,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         Hàm cần xử lý lỗi ValueError nhẹ nhàng và bỏ qua giao dịch.
         """
         raw_text = "ID: T009, Amount: Not a number, Desc: Test"
-        self.assertEqual(process_and_analyze_ocr_output(raw_text), [])
+        self.assertEqual(process_and_analyze_ocr_output(raw_text, config_rules), [])
 
     # ===== Test Case 5: Kiểm tra Bug Fix cho Description =====
     def test_description_parsing_and_cleaning(self):
@@ -75,7 +77,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         và loại bỏ được dấu phẩy ở cuối.
         """
         raw_text = "ID: T006, Date: 2025-07-31, Description: Rút tiền mặt khẩn cấp, Amount: 5,000,000"
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['description'], 'Rút tiền mặt khẩn cấp')
 
@@ -85,7 +87,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         Kiểm tra cụ thể việc phân loại chính xác cho danh mục "Tiếp khách & Ăn uống".
         """
         raw_text = "ID: T010, Amount: 150000, Desc: Cà phê với khách hàng ABC"
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['category'], 'Tiếp khách & Ăn uống')
         
@@ -96,7 +98,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         nhưng không chứa từ khóa nhạy cảm.
         """
         raw_text = "ID: T011, Amount: 3000001, Desc: Mua phần mềm bản quyền"
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertTrue(result[0]['is_suspicious'])
     
@@ -107,7 +109,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         nhưng số tiền lại nhỏ.
         """
         raw_text = "ID: T012, Amount: 100000, Desc: Phí rút tiền mặt tại ATM"
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertTrue(result[0]['is_suspicious'])
 
@@ -118,7 +120,7 @@ class TestProcessOCRSolution(unittest.TestCase):
         Hàm cần gán giá trị mặc định (chuỗi rỗng) và phân loại là "Khác".
         """
         raw_text = "ID: T013, Date: 2025-08-01, Amount: 500000"
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]['description'], '')
         self.assertEqual(result[0]['category'], 'Khác')
@@ -136,10 +138,21 @@ class TestProcessOCRSolution(unittest.TestCase):
             'description': 'Ăn trưa cùng team', 'category': 'Tiếp khách & Ăn uống', 
             'is_suspicious': False
         }
-        result = process_and_analyze_ocr_output(raw_text)
+        result = process_and_analyze_ocr_output(raw_text, config_rules)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0], expected)
 
 # Chạy các unit test khi file được thực thi trực tiếp
 if __name__ == '__main__':
+    # Đọc file cấu hình khi chạy chương trình
+    try:
+        with open('config.json', 'r', encoding='utf-8') as f:
+            config_rules = json.load(f)
+    except FileNotFoundError:
+        logging.error("Lỗi: Không tìm thấy file 'config.json'. Vui lòng tạo file cấu hình.")
+        config_rules = {} # Thoát hoặc dùng config mặc định
+    except json.JSONDecodeError:
+        logging.error("Lỗi: File 'config.json' có định dạng không hợp lệ.")
+        config_rules = {}
+        
     unittest.main(argv=['first-arg-is-ignored'], exit=False)
